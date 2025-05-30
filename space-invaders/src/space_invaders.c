@@ -1,9 +1,6 @@
 #include "raylib.h"
 #include <math.h>
 
-//----------------------------------------------------------------------------------
-// Some Defines
-//----------------------------------------------------------------------------------
 #define NUM_SHOOTS 5
 #define NUM_MAX_ENEMIES 50
 #define FIRST_WAVE 50
@@ -14,9 +11,6 @@
 #define GRID_OFFSET_X 65
 #define GRID_OFFSET_Y 120
 
-//----------------------------------------------------------------------------------
-// Types and Structures Definition
-//----------------------------------------------------------------------------------
 typedef struct Player{
     Rectangle rec;
     Vector2 speed;
@@ -38,9 +32,6 @@ typedef struct Shoot{
     Color color;
 } Shoot;
 
-//------------------------------------------------------------------------------------
-// Global Variables Declaration
-//------------------------------------------------------------------------------------
 static const int screenWidth = 600;
 static const int screenHeight = 800;
 
@@ -62,53 +53,30 @@ static int activeEnemies = 0;
 static int enemiesKill = 0;
 static bool smooth = false;
 
-//------------------------------------------------------------------------------------
-// Module Functions Declaration (local)
-//------------------------------------------------------------------------------------
-static void InitGame(void);         // Initialize game
-static void UpdateGame(void);       // Update game (one frame)
-static void DrawGame(void);         // Draw game (one frame)
-static void UnloadGame(void);       // Unload game
-static void UpdateDrawFrame(void);  // Update and Draw (one frame)
+static void InitGame(void);         
+static void UpdateGame(void);       
+static void DrawGame(void);         
+static void UnloadGame(void);       
+static void UpdateDrawFrame(void);  
 
-//------------------------------------------------------------------------------------
-// Program main entry point
-//------------------------------------------------------------------------------------
 int main(void)
 {
-    // Initialization (Note windowTitle is unused on Android)
-    //---------------------------------------------------------
     InitWindow(screenWidth, screenHeight, "classic game: space invaders");
-
     InitGame();
-
     SetTargetFPS(60);
-    //--------------------------------------------------------------------------------------
 
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
-        // Update and Draw
-        //----------------------------------------------------------------------------------
-        UpdateDrawFrame();
-        //----------------------------------------------------------------------------------
+        UpdateGame();
+        DrawGame();
     }
-    
-    // De-Initialization
-    //--------------------------------------------------------------------------------------
+
     UnloadGame();         // Unload loaded data (textures, sounds, models...)
-
     CloseWindow();        // Close window and OpenGL context
-    //--------------------------------------------------------------------------------------
-
     return 0;
 }
 
-//------------------------------------------------------------------------------------
-// Module Functions Definitions (local)
-//------------------------------------------------------------------------------------
-
-// Initialize game variables
 void InitGame(void)
 {
     // Initialize game variables
@@ -163,7 +131,6 @@ void InitGame(void)
     }
 }
 
-// Update game (one frame)
 void UpdateGame(void)
 {
     if (!gameOver)
@@ -301,7 +268,6 @@ void UpdateGame(void)
     }
 }
 
-// Draw game (one frame)
 void DrawGame(void)
 {
     BeginDrawing();
@@ -347,15 +313,7 @@ void DrawGame(void)
     EndDrawing();
 }
 
-// Unload game variables
 void UnloadGame(void)
 {
     // TODO: Unload all dynamic loaded data (textures, sounds, models...)
-}
-
-// Update and Draw (one frame)
-void UpdateDrawFrame(void)
-{
-    UpdateGame();
-    DrawGame();
 }
