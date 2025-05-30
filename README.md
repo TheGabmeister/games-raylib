@@ -1,2 +1,2 @@
-# raylib-games
+# Raylib Games
 Raylib Games
