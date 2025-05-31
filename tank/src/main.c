@@ -12,6 +12,13 @@
 #define BULLET_RADIUS 4
 #define MAX_BULLETS 3
 
+#define MAX_OBSTACLES 6
+#define OBSTACLE_SIZE 64
+
+typedef struct {
+    Rectangle rect;
+} Obstacle;
+
 typedef struct {
     Vector2 position;
     float rotation;
@@ -29,6 +36,7 @@ typedef struct Bullet {
 
 static Tank tank1, tank2;
 static Bullet bullets1[MAX_BULLETS], bullets2[MAX_BULLETS];
+static Obstacle obstacles[MAX_OBSTACLES];
 
 static void InitGame(void);
 static void UpdateGame(void);
@@ -39,6 +47,9 @@ static void UpdateTank(Tank *tank, Bullet *bullets[]);
 static void DrawTank(Tank *tank);
 static void UpdateBullets(Bullet *bullets[]);
 static void DrawBullets(Bullet *bullets[]);
+
+static void DrawObstacles(void);
+static bool CheckTankObstacleCollision(Vector2 nextPos);
 
 int main(void)
 {
@@ -86,6 +97,15 @@ void InitGame(void)
         bullets2[i].active = false;
         tank2.bullets[i] = &bullets2[i];
     }
+
+    // Place obstacles at fixed positions (you can randomize or adjust as needed)
+    obstacles[0].rect = (Rectangle){ SCREEN_WIDTH/2 - OBSTACLE_SIZE/2, 200, OBSTACLE_SIZE, OBSTACLE_SIZE };
+    obstacles[1].rect = (Rectangle){ 100, 400, OBSTACLE_SIZE, OBSTACLE_SIZE };
+    obstacles[2].rect = (Rectangle){ SCREEN_WIDTH - 100 - OBSTACLE_SIZE, 400, OBSTACLE_SIZE, OBSTACLE_SIZE };
+    obstacles[3].rect = (Rectangle){ SCREEN_WIDTH/2 - OBSTACLE_SIZE/2, 600, OBSTACLE_SIZE, OBSTACLE_SIZE };
+    obstacles[4].rect = (Rectangle){ 200, 700, OBSTACLE_SIZE, OBSTACLE_SIZE };
+    obstacles[5].rect = (Rectangle){ SCREEN_WIDTH - 200 - OBSTACLE_SIZE, 700, OBSTACLE_SIZE, OBSTACLE_SIZE };
+
 }
 
 void UpdateGame(void)
@@ -105,6 +125,7 @@ void DrawGame(void)
     DrawTank(&tank2);
     DrawBullets(tank1.bullets);
     DrawBullets(tank2.bullets);
+    DrawObstacles();
 
     EndDrawing();
 }
@@ -117,28 +138,45 @@ void UnloadGame(void)
 void UpdateTank(Tank *tank, Bullet *bullets[])
 {
     // Movement
-    if (IsKeyDown(tank->leftKey)) tank->rotation -= TANK_ROT_SPEED;
-    if (IsKeyDown(tank->rightKey)) tank->rotation += TANK_ROT_SPEED;
+    float nextRot = tank->rotation;
+    if (IsKeyDown(tank->leftKey)) nextRot -= TANK_ROT_SPEED;
+    if (IsKeyDown(tank->rightKey)) nextRot += TANK_ROT_SPEED;
 
     Vector2 forward = {
-        sinf(DEG2RAD * tank->rotation),
-        -cosf(DEG2RAD * tank->rotation)
+        sinf(DEG2RAD * nextRot),
+        -cosf(DEG2RAD * nextRot)
     };
 
+    Vector2 nextPos = tank->position;
+
     if (IsKeyDown(tank->upKey)) {
-        tank->position.x += forward.x * TANK_SPEED;
-        tank->position.y += forward.y * TANK_SPEED;
+        Vector2 tryPos = {
+            tank->position.x + forward.x * TANK_SPEED,
+            tank->position.y + forward.y * TANK_SPEED
+        };
+        if (!CheckTankObstacleCollision(tryPos)) {
+            nextPos = tryPos;
+        }
     }
     if (IsKeyDown(tank->downKey)) {
-        tank->position.x -= forward.x * TANK_SPEED;
-        tank->position.y -= forward.y * TANK_SPEED;
+        Vector2 tryPos = {
+            tank->position.x - forward.x * TANK_SPEED,
+            tank->position.y - forward.y * TANK_SPEED
+        };
+        if (!CheckTankObstacleCollision(tryPos)) {
+            nextPos = tryPos;
+        }
     }
 
     // Clamp to screen
-    if (tank->position.x < TANK_SIZE/2) tank->position.x = TANK_SIZE/2;
-    if (tank->position.x > SCREEN_WIDTH - TANK_SIZE/2) tank->position.x = SCREEN_WIDTH - TANK_SIZE/2;
-    if (tank->position.y < TANK_SIZE/2) tank->position.y = TANK_SIZE/2;
-    if (tank->position.y > SCREEN_HEIGHT - TANK_SIZE/2) tank->position.y = SCREEN_HEIGHT - TANK_SIZE/2;
+    if (nextPos.x < TANK_SIZE/2) nextPos.x = TANK_SIZE/2;
+    if (nextPos.x > SCREEN_WIDTH - TANK_SIZE/2) nextPos.x = SCREEN_WIDTH - TANK_SIZE/2;
+    if (nextPos.y < TANK_SIZE/2) nextPos.y = TANK_SIZE/2;
+    if (nextPos.y > SCREEN_HEIGHT - TANK_SIZE/2) nextPos.y = SCREEN_HEIGHT - TANK_SIZE/2;
+
+    // Only update rotation if not colliding
+    tank->rotation = nextRot;
+    tank->position = nextPos;
 
     // Fire
     if (IsKeyPressed(tank->fireKey)) {
@@ -199,4 +237,28 @@ void DrawBullets(Bullet *bullets[])
             DrawCircleV(bullets[i]->position, BULLET_RADIUS, WHITE);
         }
     }
+}
+
+void DrawObstacles(void)
+{
+    for (int i = 0; i < MAX_OBSTACLES; i++) {
+        DrawRectangleRec(obstacles[i].rect, GRAY);
+        DrawRectangleLinesEx(obstacles[i].rect, 2, BLACK);
+    }
+}
+
+bool CheckTankObstacleCollision(Vector2 nextPos)
+{
+    Rectangle tankRect = {
+        nextPos.x - TANK_SIZE/2,
+        nextPos.y - TANK_SIZE*0.3f,
+        TANK_SIZE,
+        TANK_SIZE * 0.6f
+    };
+    for (int i = 0; i < MAX_OBSTACLES; i++) {
+        if (CheckCollisionRecs(tankRect, obstacles[i].rect)) {
+            return true;
+        }
+    }
+    return false;
 }
