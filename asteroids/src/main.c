@@ -2,8 +2,11 @@
 #include <math.h>
 #include <stdlib.h>
 
+Music music = { 0 };
+
 #define SCREEN_WIDTH 720
 #define SCREEN_HEIGHT 900
+#define STARTING_LIVES 3
 #define SHIP_SIZE 30
 #define SHIP_TURN_SPEED 5.0f
 #define SHIP_ACCELERATION 0.2f
@@ -16,6 +19,9 @@
 #define ASTEROID_MAX_SIZE 60
 #define ASTEROID_MIN_SPEED 1.0f
 #define ASTEROID_MAX_SPEED 3.0f
+
+static int score = 0;
+static int lives = STARTING_LIVES;
 
 typedef struct {
     Vector2 pos;
@@ -55,6 +61,12 @@ static void SpawnAsteroid(Vector2 pos, float size);
 int main(void)
 {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "asteroids");
+
+    InitAudioDevice();    
+    music = LoadMusicStream("resources/background-music.ogg"); 
+    SetMusicVolume(music, 1.0f);
+    PlayMusicStream(music);
+
     InitGame();
     SetTargetFPS(60);
 
@@ -62,6 +74,7 @@ int main(void)
     {
         UpdateGame();
         DrawGame();
+        UpdateMusicStream(music);
     }
 
     UnloadGame();
@@ -83,6 +96,13 @@ void InitGame(void)
     for (int i = 0; i < 5; i++) {
         Vector2 pos = {GetRandomValue(0, SCREEN_WIDTH), GetRandomValue(0, SCREEN_HEIGHT)};
         SpawnAsteroid(pos, ASTEROID_MAX_SIZE);
+    }
+
+    static bool firstInit = true;
+    if (firstInit) {
+        score = 0;
+        lives = STARTING_LIVES;
+        firstInit = false;
     }
 }
 
@@ -156,11 +176,14 @@ void UpdateGame(void)
             if (dist < asteroids[j].size) {
                 bullets[i].active = false;
                 asteroids[j].active = false;
-                // Split asteroid
+                // Score based on asteroid size
                 if (asteroids[j].size > ASTEROID_MIN_SIZE) {
+                    score += 20;
                     for (int s = 0; s < 2; s++) {
                         SpawnAsteroid(asteroids[j].pos, asteroids[j].size/2);
                     }
+                } else {
+                    score += 50;
                 }
                 break;
             }
@@ -174,8 +197,17 @@ void UpdateGame(void)
         float dy = ship.pos.y - asteroids[i].pos.y;
         float dist = sqrtf(dx*dx + dy*dy);
         if (dist < asteroids[i].size + ship.radius) {
-            // Reset game on collision
-            InitGame();
+            // Lose a life on collision
+            lives--;
+            if (lives > 0) {
+                // Respawn ship and asteroids, but keep score and lives
+                InitGame();
+            } else {
+                // Game over: reset everything
+                score = 0;
+                lives = STARTING_LIVES;
+                InitGame();
+            }
             break;
         }
     }
@@ -185,6 +217,9 @@ void DrawGame(void)
 {
     BeginDrawing();
     ClearBackground(BLACK);
+
+    DrawText(TextFormat("Score: %d", score), 20, 20, 32, WHITE);
+    DrawText(TextFormat("Lives: %d", lives), SCREEN_WIDTH - 160, 20, 32, WHITE);
 
     // Draw ship
     Vector2 nose = {
@@ -230,7 +265,7 @@ void DrawGame(void)
 
 void UnloadGame(void)
 {
-    // No dynamic resources to unload
+    UnloadMusicStream(music);
 }
 
 void FireBullet(void)
