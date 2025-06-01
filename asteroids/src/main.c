@@ -2,8 +2,6 @@
 #include <math.h>
 #include <stdlib.h>
 
-Music music = { 0 };
-
 #define SCREEN_WIDTH 720
 #define SCREEN_HEIGHT 900
 #define STARTING_LIVES 3
@@ -22,6 +20,9 @@ Music music = { 0 };
 
 static int score = 0;
 static int lives = STARTING_LIVES;
+
+Music music = { 0 };
+Sound fxLaser = { 0 };
 
 typedef struct {
     Vector2 pos;
@@ -64,6 +65,7 @@ int main(void)
 
     InitAudioDevice();    
     music = LoadMusicStream("resources/background-music.ogg"); 
+    fxLaser = LoadSound("resources/laser.wav");
     SetMusicVolume(music, 1.0f);
     PlayMusicStream(music);
 
@@ -277,6 +279,7 @@ void FireBullet(void)
             bullets[i].vel.x = cosf(DEG2RAD * ship.angle) * BULLET_SPEED;
             bullets[i].vel.y = sinf(DEG2RAD * ship.angle) * BULLET_SPEED;
             bulletTimer[i] = 0;
+            PlaySound(fxLaser);
             break;
         }
     }
