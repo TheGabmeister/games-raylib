@@ -22,7 +22,8 @@ static int score = 0;
 static int lives = STARTING_LIVES;
 
 Music music = { 0 };
-Sound fxLaser = { 0 };
+Sound sfxLaser = { 0 };
+Sound sfxAsteroidExplode = { 0 };
 
 typedef struct {
     Vector2 pos;
@@ -64,8 +65,10 @@ int main(void)
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "asteroids");
 
     InitAudioDevice();    
-    music = LoadMusicStream("resources/background-music.ogg"); 
-    fxLaser = LoadSound("resources/laser.wav");
+    music = LoadMusicStream("resources/background_music.ogg"); 
+    sfxLaser = LoadSound("resources/laser.wav");
+    sfxAsteroidExplode = LoadSound("resources/sfx_asteroid_explode.ogg");
+
     SetMusicVolume(music, 1.0f);
     PlayMusicStream(music);
 
@@ -187,6 +190,7 @@ void UpdateGame(void)
                 } else {
                     score += 50;
                 }
+                PlaySound(sfxAsteroidExplode);
                 break;
             }
         }
@@ -268,6 +272,8 @@ void DrawGame(void)
 void UnloadGame(void)
 {
     UnloadMusicStream(music);
+    UnloadSound(sfxLaser);
+    UnloadSound(sfxAsteroidExplode);
 }
 
 void FireBullet(void)
@@ -279,7 +285,7 @@ void FireBullet(void)
             bullets[i].vel.x = cosf(DEG2RAD * ship.angle) * BULLET_SPEED;
             bullets[i].vel.y = sinf(DEG2RAD * ship.angle) * BULLET_SPEED;
             bulletTimer[i] = 0;
-            PlaySound(fxLaser);
+            PlaySound(sfxLaser);
             break;
         }
     }
