@@ -107,13 +107,37 @@ void UpdateGame(void)
     DrawText(TextFormat("Timer done: %s", TimerDone(timer) ? "true" : "false"), 20, 60, 32, WHITE);
     if (TimerDone(timer))
     {
-        // Move enemy down towards the bottom of the screen
+        // Move enemy along a curved path (arc up-right, then down-left)
         if (enemy.alive) {
-            enemy.rect.y += ENEMY_SPEED;
+            // Parameters for the curve
+            static float t = 0.0f;
+            const float curveDuration = 2.0f; // seconds for a full curve
+            const float arcRadius = 200.0f;
+            const float centerX = SCREEN_WIDTH / 2.0f;
+            const float centerY = SCREEN_HEIGHT / 2.0f;
+
+            t += GetFrameTime() / curveDuration;
+            
+            // Arc up-right (first half), then down-left (second half)
+            float angle;
+            if (t < 0.5f) {
+            // Move from bottom center, arc up and right (0.75pi to 0.25pi)
+            angle = Lerp(3.0f * PI / 4.0f, PI / 4.0f, t * 2.0f);
+            } else {
+            // Move from top right, arc down and left (0.25pi to 1.25pi)
+            angle = Lerp(PI / 4.0f, 5.0f * PI / 4.0f, (t - 0.5f) * 2.0f);
+            }
+
+            TraceLog(LOG_INFO, TextFormat("t: %.2f", angle));
+
+            enemy.rect.x = centerX + arcRadius * cosf(angle) - ENEMY_WIDTH / 2.0f;
+            enemy.rect.y = centerY + arcRadius * sinf(angle) - ENEMY_HEIGHT / 2.0f;
+
+            // If enemy reaches bottom of the screen, reset
             if (enemy.rect.y > SCREEN_HEIGHT - ENEMY_HEIGHT) {
-            // Respawn enemy in the center and restart timer
             enemy.rect.x = (SCREEN_WIDTH - ENEMY_WIDTH) / 2;
             enemy.rect.y = SCREEN_HEIGHT / 2 - ENEMY_HEIGHT / 2;
+            t = 0.0f;
             StartTimer(&timer, 1.0f);
             }
         }
