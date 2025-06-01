@@ -4,7 +4,7 @@
 
 #define SCREEN_WIDTH 720
 #define SCREEN_HEIGHT 900
-#define SHIP_SIZE 20
+#define SHIP_SIZE 30
 #define SHIP_TURN_SPEED 5.0f
 #define SHIP_ACCELERATION 0.2f
 #define SHIP_FRICTION 0.99f
@@ -199,7 +199,7 @@ void DrawGame(void)
         ship.pos.x + cosf(DEG2RAD * (ship.angle - 140)) * SHIP_SIZE * 0.6f,
         ship.pos.y + sinf(DEG2RAD * (ship.angle - 140)) * SHIP_SIZE * 0.6f
     };
-    DrawTriangle(nose, left, right, WHITE);
+    DrawTriangle(nose, right, left, WHITE);
 
     // Draw bullets
     for (int i = 0; i < MAX_BULLETS; i++) {
