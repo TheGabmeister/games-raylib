@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24...3.30)
-project(galaxian)
+project(template_empty)
 
 # Dependencies
 add_subdirectory(vendor/raylib)

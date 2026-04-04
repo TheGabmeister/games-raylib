@@ -2,7 +2,7 @@
 
 int main(void)
 {
-    InitWindow(800, 450, "Galaxian");
+    InitWindow(800, 450, "Template");
     SetTargetFPS(60);
 
     while (!WindowShouldClose())
