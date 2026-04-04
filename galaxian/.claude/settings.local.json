@@ -11,7 +11,9 @@
       "Bash(cmake .. -G \"MinGW Makefiles\")",
       "Bash(cmake ..)",
       "Bash(cmake --build .)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(timeout 5 build/galaxian/Debug/galaxian.exe)",
+      "Bash(timeout 4 build/galaxian/Debug/galaxian.exe)"
     ]
   }
 }

@@ -2,7 +2,9 @@
 
 ## 1. Overview
 
-A modernized 2D recreation of Galaxian (1979) in C using raylib. All visuals use primitive shapes only — no sprites, textures, or audio. The visual style is **neon vector** (inspired by Geometry Wars): bright outlines on black, additive-blended glows, particle trails, and optional bloom.
+A modernized 2D recreation of Galaxian (1979) in C using raylib. All visuals use primitive shapes only — no sprites, no loaded textures, no audio. `RenderTexture2D` is used internally for the virtual resolution pipeline and optional bloom, but no image files are loaded. The visual style is **neon vector** (inspired by Geometry Wars): bright outlines on black, additive-blended glows, particle trails, and optional bloom.
+
+**Window size:** 720x960 (scales the virtual resolution cleanly at 1.5x).
 
 **Virtual resolution:** 480x640 (3:4 portrait, 2x the original 240x320). Rendered to a `RenderTexture2D`, then scaled to the window with letterboxing so all coordinate math is resolution-independent.
 
@@ -45,23 +47,29 @@ Every entity is drawn with three layers:
 - Left/right movement only, clamped to screen bounds
 - **Single bullet at a time** — must wait for previous shot to hit or exit screen
 - Bullet speed: traverses full screen in ~0.4 seconds
-- Lives system with respawn timer after death
+- **3 starting lives**, bonus life awarded at 7000 points (one-time)
+- On death: brief explosion, then respawn after ~1.5 seconds with ~2 seconds of invincibility (ship blinks). Formation and remaining enemies persist through deaths.
+- **Game over** when all lives are lost
+- **Input:** Arrow keys or A/D for movement, Space to fire
 
 ### Formation
 
-- **46 enemies** arranged in a 10-column, 5-row grid:
-  - Row 0: 2 Flagships (centered)
-  - Row 1: 6 Red
-  - Row 2: 8 Purple
-  - Rows 3-4: 10 Blue each (20 total)
+- **46 enemies** arranged in a 10-column, 6-row grid:
+  - Row 0: 2 Flagships (centered, columns 4-5)
+  - Row 1: 6 Red (columns 2-7)
+  - Row 2: 8 Purple (columns 1-8)
+  - Rows 3-5: 10 Blue each (30 total, columns 0-9)
+- **Stage entry animation:** enemies fly in from the top of the screen in groups and settle into their formation slots before gameplay begins
 - Formation sways horizontally (sinusoidal oscillation)
 - Sway speed and amplitude increase with difficulty
 
 ### Diving AI
 
 - A cooldown timer triggers dives; when it fires, an enemy is selected to break formation
+- **Max concurrent divers:** 2-4 (scales with difficulty), not counting returning enemies
 - Priority: flagships first, then lower-row enemies weighted higher
-- Flagship dives are escorted by up to 2 adjacent Red enemies
+- Flagship dives are escorted by up to 2 adjacent Red enemies (escorts don't count toward diver limit)
+- **Diving enemies kill the player on direct body contact** (kamikaze). The enemy is also destroyed (no points awarded for kamikaze).
 - Enemies that exit the screen bottom wrap to the top and return to their formation slot
 
 ### Dive Paths
@@ -84,10 +92,10 @@ Every entity is drawn with three layers:
 | Blue | 30 | 60 |
 | Purple | 40 | 80 |
 | Red | 50 | 100 |
-| Flagship (alone) | 60 | 150 |
-| Flagship + 1 escort alive | — | 200 |
-| Flagship + 2 escorts alive | — | 300 |
-| Flagship (both escorts killed first) | — | 800 |
+| Flagship (diving alone, no escorts) | 60 | 150 |
+| Flagship (diving with 1 escort) | — | 200 |
+| Flagship (diving with 2 escorts) | — | 300 |
+| Flagship (escorts killed during same dive, then flagship killed) | — | 800 |
 
 Score popups float upward and fade out over ~1 second.
 
@@ -104,6 +112,7 @@ Score popups float upward and fade out over ~1 second.
 | Formation sway speed | 1.0 | 2.5 |
 | Formation sway amplitude | 30px | 50px |
 | Dive cooldown | 3.0s | 1.0s |
+| Max concurrent divers | 2 | 4 |
 | Aggression | 0.3 | 1.0 |
 | Enemy shot frequency | 0.5/s | 2.5/s |
 | Dive speed multiplier | 1.0x | 1.8x |
@@ -155,6 +164,10 @@ src/
   collision.h/.c   — Circle-based collision checks between entity groups
   ui.h/.c          — HUD, title screen, game over screen, stage flags
 ```
+
+### Timing
+
+All movement and animation uses delta-time (`GetFrameTime()`) for frame-rate independence. Target is 60 FPS via `SetTargetFPS(60)`.
 
 ### Screen State Machine
 

@@ -5,7 +5,21 @@ project(galaxian)
 add_subdirectory(vendor/raylib)
 
 # Our Project
-add_executable(${PROJECT_NAME} src/main.c)
+add_executable(${PROJECT_NAME}
+    src/main.c
+    src/game.c
+    src/player.c
+    src/enemy.c
+    src/formation.c
+    src/bullet.c
+    src/particle.c
+    src/starfield.c
+    src/effects.c
+    src/draw_utils.c
+    src/path.c
+    src/collision.c
+    src/ui.c
+)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PROJECT_NAME})

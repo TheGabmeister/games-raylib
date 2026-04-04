@@ -5,7 +5,17 @@ project(defender)
 add_subdirectory(vendor/raylib)
 
 # Our Project
-add_executable(${PROJECT_NAME} src/main.c)
+add_executable(${PROJECT_NAME}
+    src/main.c
+    src/game.c
+    src/input.c
+    src/world.c
+    src/player.c
+    src/enemy.c
+    src/wave.c
+    src/effects.c
+    src/render.c
+)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PROJECT_NAME})

@@ -4,7 +4,7 @@
 
 This project recreates the core feel of Defender (1981) as a 2D side-scrolling arcade action game in C using raylib. The target is a faithful-plus remake: preserve the signature mechanics, pacing, and tension of the original while modernizing readability, visual polish, and code organization.
 
-The game must remain primitive-only. All visuals are built from raylib drawing APIs such as lines, triangles, circles, rectangles, and text. The project must not use sprites, textures, render textures, shaders, audio, music, or sound effects. The game is Windows-first, single-player, and designed to build cleanly through the existing CMake setup.
+The game must remain primitive-only. All gameplay art and effects are built from raylib drawing APIs such as lines, triangles, circles, rectangles, and text. The project must not use imported sprites, textures, render textures, shaders, audio, music, or sound effects. Built-in raylib text drawing is allowed for HUD and menu text because it does not introduce a project-managed asset pipeline. The game is Windows-first, single-player, and designed to build cleanly through the existing CMake setup.
 
 This document defines the full target game and the implementation architecture expected for the codebase.
 
@@ -27,7 +27,7 @@ This document defines the full target game and the implementation architecture e
 - Language: C
 - Framework: raylib only, via the vendored dependency already in the repository
 - Platform priority: Windows desktop first
-- Rendering: primitive-only raylib drawing; no sprites, textures, shaders, or render textures
+- Rendering: primitive-only gameplay art and effects; no imported sprites, no project-managed texture assets, no gameplay shaders, and no render textures
 - Audio: none
 - Runtime assets: none
 - Networking: none
@@ -35,6 +35,35 @@ This document defines the full target game and the implementation architecture e
 - Scope: one local player
 - Build system: keep the existing CMake flow; modify `CMakeLists.txt` only if implementation truly requires it
 - Vendor policy: do not modify `vendor/`
+
+## Game Flow
+
+The game should use a small, explicit state machine with these launch states:
+
+1. Title
+2. Playing
+3. Paused
+4. Wave Clear
+5. Game Over
+
+Required flow behavior:
+
+- Boot to Title
+- Press confirm/start to begin a new run at wave 1
+- Transition to Playing immediately with a short wave-intro HUD callout
+- Enter Paused without advancing simulation
+- Enter Wave Clear once a wave has been fully resolved
+- Advance automatically from Wave Clear to the next wave after a short delay or on confirm
+- Enter Game Over when the player has no remaining lives and no respawn is pending
+- From Game Over, allow restart to a fresh run or return to Title
+
+Respawn behavior defaults:
+
+- The player starts with 3 lives
+- After death, consume 1 life and respawn after a short delay if lives remain
+- Respawning does not reset the current wave
+- Respawn grants 1.5 seconds of invulnerability
+- Smart bombs reset to the life default on respawn
 
 ## Core Gameplay Loop
 
@@ -58,6 +87,38 @@ Failure pressure comes from:
 - allowing landers to escape with abducted humans and create mutants
 - poor use of hyperspace and smart bombs
 
+Wave completion is defined as:
+
+- no living enemies remain
+- no lander is currently carrying a human
+- no human is currently falling
+- all delayed split or spawn events for the current wave have been resolved
+
+## World Layout And Defaults
+
+The game world uses a single horizontally wrapping playfield.
+
+Required defaults:
+
+- Viewport target: 1280x720
+- World width: 6400 world units
+- World height: 720 world units
+- Horizontal wrap: seamless for player, enemies, projectiles, humans, and camera presentation
+- Terrain band: occupies the lower portion of the world as a continuous heightfield silhouette
+
+Terrain implementation defaults:
+
+- Terrain should be represented as a simple sampled height curve or polyline, not tile maps
+- Terrain is used for human placement, safe drop checks, and low-altitude collision risk
+- The player is destroyed on hard terrain collision
+- Humans are safe only when placed onto valid terrain surface with low downward speed
+
+Vertical bounds defaults:
+
+- The upper play bound should leave a small buffer above visible flight space
+- Crossing the upper bound clamps or gently pushes entities back into valid space
+- Falling below safe terrain resolution kills the player or human as appropriate
+
 ## Player Abilities
 
 The player ship must support the following actions:
@@ -74,10 +135,17 @@ The player ship must support the following actions:
 Behavior defaults:
 
 - Movement uses acceleration plus damping rather than tile-like stepping
+- Facing follows the last non-zero horizontal movement intent
 - The ship has a clear facing direction and readable thrust state
 - Primary fire has a short cooldown and modest projectile speed advantage over enemies
-- Smart bombs are limited per life or per wave and replenishment rules must be explicit in implementation
-- Hyperspace is instant relocation with deliberate risk, such as unsafe arrival or self-damage chance
+- Primary fire cooldown default: 0.12 seconds
+- Primary shots expire after 1.5 seconds if they do not hit a target
+- Smart bombs default to 3 per life
+- Smart bomb effect destroys all active enemy projectiles and all visible enemies except pods, which instead take lethal damage and split normally
+- Hyperspace has a 4.0 second cooldown
+- Hyperspace instantly teleports the player to a random safe horizontal location and mid-altitude band
+- Hyperspace has a 15% chance to destroy the player on use, increased by 10% for each additional hyperspace use during the same life
+- Hyperspace failure chance resets on respawn
 
 The implementation should expose these systems through a `Player` type and an `UpdatePlayer` function that consumes `InputState`, mutates the player, and emits gameplay events such as shots fired, human pickup, and special ability use.
 
@@ -94,7 +162,16 @@ Required rules:
 - If a human falls, the player can catch and carry them
 - If the player drops a carried human onto safe terrain at low enough speed, the human survives
 - If a human falls too far or is dropped unsafely, the human dies
-- Human survival influences score, end-of-wave results, or both
+- Human survival affects both score and end-of-wave outcomes
+- If the player dies while carrying a human, the human immediately enters the falling state
+
+Rescue defaults:
+
+- Each wave starts with 10 humans
+- Catching a falling human awards 250 points
+- Safely returning a carried human awards 500 points
+- Completing a wave awards 1000 bonus points for each surviving human
+- If all humans die, the wave continues, but subsequent waves spawn with the normal human count
 
 The implementation should model humans explicitly with a `Human` type and track state such as grounded, abducted, falling, carried, rescued, and dead.
 
@@ -110,6 +187,24 @@ Required enemy categories:
 - Baiter: anti-stall hunter that pressures the player if a wave runs long
 - Swarmer: small fast threat created from specific wave events or enemy types
 - Pod: durable carrier enemy that splits into swarmers when destroyed
+
+Behavior defaults by type:
+
+- Lander: patrols, selects humans, descends to abduct, and fires occasional direct shots at the player
+- Mutant: fast hunter created from completed abductions; ignores humans and aggressively chases the player with direct fire
+- Bomber: slower mover that drops stationary or drifting mines into the player's path
+- Baiter: direct-response hunter that spawns after extended wave duration and pressures stalling play
+- Swarmer: very fast short-life attacker spawned from pod destruction; no human interaction
+- Pod: medium-speed durable enemy that splits into 3 swarmers on death
+
+Score defaults by type:
+
+- Lander: 150
+- Mutant: 150
+- Bomber: 250
+- Swarmer: 150
+- Baiter: 200
+- Pod: 1000
 
 Enemy design rules:
 
@@ -132,7 +227,17 @@ Wave system requirements:
 - Later waves introduce baiters sooner and increase mutant risk
 - Endless progression is acceptable after a designed sequence of authored early waves
 
-Wave completion should occur when the active hostile requirement is cleared and no critical abduction sequence remains unresolved.
+Authored wave defaults:
+
+- Wave 1: 5 landers, rescue tutorial pressure
+- Wave 2: 6 landers and 1 bomber
+- Wave 3: 6 landers, 2 bombers, and 1 pod
+- Wave 4: 8 landers, 2 bombers, and 2 pods
+- Wave 5+: introduce baiter pressure timers and denser mutant recovery situations
+- Initial baiter timer default: 25 seconds after wave start
+- Endless scaling after wave 5 increases total enemy count gradually and shortens baiter timers by 2 seconds per wave to a floor of 10 seconds
+
+Wave completion should follow the earlier wave-resolution rule and should not require an additional hidden objective.
 
 Wave progression should track:
 
@@ -174,12 +279,17 @@ Gamepad default mapping:
 
 - left stick or d-pad for horizontal movement
 - south face button for thrust
-- west or right trigger for fire
+- right trigger for fire
+- west face button as alternate fire
 - left shoulder for smart bomb
 - right shoulder for hyperspace
 - start for pause/confirm
 
 The input system should expose an `InputAction` enum and an `InputState` structure with pressed, held, and analog data normalized for both devices.
+
+Deadzone default:
+
+- Gamepad horizontal analog input should use a 0.2 deadzone before normalization
 
 ## Visual Direction
 
@@ -198,6 +308,19 @@ Visual goals:
 - Readable HUD with score, lives, smart bombs, wave number, and human status
 - Compact radar or minimap to support world awareness
 - Camera easing and restrained screen shake on impacts and bomb use
+
+HUD defaults:
+
+- Top-left: score and wave
+- Top-right: lives and smart bomb stock
+- Bottom or top-center strip: human survival status
+- Radar: compact horizontal strip showing player, humans, and enemies across full world width
+
+Camera defaults:
+
+- Camera follows the player with look-ahead in facing direction
+- Camera smoothing should be strong enough to avoid jitter but light enough to preserve responsiveness
+- Screen shake should be short and low amplitude, reserved for deaths, bomb use, and major impacts
 
 Approved effect techniques:
 
@@ -264,6 +387,19 @@ Required top-level functions or equivalent entry points:
 - `RenderWorld`
 - `RenderHud`
 
+Recommended source files:
+
+- `src/main.c`
+- `src/game.c` and `src/game.h`
+- `src/input.c` and `src/input.h`
+- `src/world.c` and `src/world.h`
+- `src/player.c` and `src/player.h`
+- `src/enemy.c` and `src/enemy.h`
+- `src/wave.c` and `src/wave.h`
+- `src/render.c` and `src/render.h`
+- `src/effects.c` and `src/effects.h`
+- `src/types.h` or `src/game_types.h`
+
 Runtime rules:
 
 - Simulation target is fixed 60 Hz
@@ -274,12 +410,39 @@ Runtime rules:
 - Avoid heap churn during active gameplay
 - Prefer explicit ownership and direct data flow over callback-heavy patterns
 
+Fixed-capacity defaults:
+
+- Humans: 16 max active
+- Enemies: 64 max active
+- Projectiles: 128 max active
+- Particles: 512 max active
+- Floating score or HUD callouts: 32 max active
+
 Collision and world rules:
 
 - Horizontal world wraps seamlessly for entities and camera presentation
 - Vertical space is bounded, with death or recovery rules defined for leaving the play band
 - Terrain collision matters for humans and low-altitude ship risk, but terrain should remain implementation-light
 - Radar/minimap should represent off-screen threats and humans consistently
+
+Implementation guidance:
+
+- Use circle or capsule approximations for gameplay collisions rather than pixel-perfect silhouette testing
+- Treat carry, rescue, and abduction interactions as explicit state transitions, not emergent overlap tricks
+- Keep render-only flourish data separate from gameplay-critical state where practical
+
+## Scoring And Progression Defaults
+
+These defaults should be implemented unless later balancing proves them harmful:
+
+- Starting lives: 3
+- Extra life threshold: every 10000 points
+- Starting smart bombs per life: 3
+- Wave-end human survivor bonus: 1000 per living human
+- No score multiplier system
+- No permanent upgrades
+
+The score and resource model should stay arcade-simple and transparent.
 
 ## Milestones
 
@@ -337,6 +500,8 @@ The project is complete for this spec when all of the following are true:
 - The simulation remains stable at a fixed 60 Hz update model
 - The codebase is organized into small modules rather than one large game file
 - The project builds cleanly with the current compiler warning settings
+- HUD and menus are readable without relying on imported assets
+- No unresolved design-critical ambiguity remains in the implementation plan
 
 ## Test Cases And Scenarios
 
@@ -354,11 +519,12 @@ Functional scenarios:
 
 Technical checks:
 
-- No sprites, textures, shaders, render textures, music, or sound APIs are used in gameplay implementation
+- No imported sprites, texture assets, gameplay shaders, render textures, music, or sound APIs are used in gameplay implementation
 - No runtime asset files are required
 - No code under `vendor/` is modified
 - Main loop preserves clear input/update/draw separation
 - Fixed-capacity containers do not overflow under expected wave caps
+- HUD text uses only built-in raylib text functionality or a documented primitive-only fallback
 
 ## Defaults And Non-Goals
 
@@ -369,6 +535,7 @@ Implementation defaults:
 - Player count: 1
 - Modes at launch: title, playing, paused, wave clear, game over
 - Rendering style: primitive-only neon sci-fi/vector aesthetic
+- Build target: desktop Windows first, with other platforms as non-blocking follow-up work
 
 Non-goals for this version:
 
