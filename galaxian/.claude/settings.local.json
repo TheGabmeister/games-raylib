@@ -10,7 +10,8 @@
       "Bash(cmake -S . -B build -G \"Visual Studio 18 2026\" -A x64 -Wno-dev)",
       "Bash(cmake .. -G \"MinGW Makefiles\")",
       "Bash(cmake ..)",
-      "Bash(cmake --build .)"
+      "Bash(cmake --build .)",
+      "WebSearch"
     ]
   }
 }
